@@ -1,5 +1,4 @@
-﻿using System;
-using OpenTK.Graphics.OpenGL4;
+﻿using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 
 namespace otk;
@@ -10,31 +9,36 @@ public class Textury
 
     public static Textury LoadFromFile(string path)
     {
-        // Generate handle
+        // generate handle
         var handle = GL.GenTexture();
-        
+
+        // bind the texture and handle
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2D, handle);
-        
+
+        // flip the texture
         StbImage.stbi_set_flip_vertically_on_load(1);
 
+        // load the texture
         using Stream stream = File.OpenRead(path);
-        
         var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, image.Width, image.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
-        
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-        
+
+        // min mag ( scaling ) filter
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+
+        // wrapping mode
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-        
+
+        // generate mipmap
         GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
 
         return new Textury(handle);
     }
-    
-    public Textury(int glHandle)
+
+    private Textury(int glHandle)
     {
         Handle = glHandle;
     }

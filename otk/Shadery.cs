@@ -1,52 +1,85 @@
 ﻿using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace otk;
 
 public class Shadery
 {
-    public readonly int Handle;
+    private readonly int Handle;
+    private readonly Dictionary<string, int>? _uniformLocations;
     
     public Shadery(string vertexPath, string fragmentPath)
     {
-        var VertexShaderSource = File.ReadAllText(vertexPath);
-        var FragmentShaderSource = File.ReadAllText(fragmentPath);
-        
-        var VertexShader = GL.CreateShader(ShaderType.VertexShader);
-        GL.ShaderSource(VertexShader, VertexShaderSource);
+        // load and compile shaders
+        var vertexShaderSource = File.ReadAllText(vertexPath);
+        var fragmentShaderSource = File.ReadAllText(fragmentPath);
 
-        var FragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-        GL.ShaderSource(FragmentShader, FragmentShaderSource);
-        
-        GL.CompileShader(VertexShader);
+        var vertexShader = GL.CreateShader(ShaderType.VertexShader);
+        GL.ShaderSource(vertexShader, vertexShaderSource);
 
-        GL.GetShader(VertexShader, ShaderParameter.CompileStatus, out var success0);
-        if (success0 == 0)   
-        {
-            var infoLog = GL.GetShaderInfoLog(VertexShader);
-            Console.WriteLine(infoLog);
-        }
+        var fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
+        GL.ShaderSource(fragmentShader, fragmentShaderSource);
 
-        GL.CompileShader(FragmentShader);
+        CompileShader(vertexShader);
+        CompileShader(fragmentShader);
 
-        GL.GetShader(FragmentShader, ShaderParameter.CompileStatus, out var success1);
-        if (success1 == 0)
-        {
-            var infoLog = GL.GetShaderInfoLog(FragmentShader);
-            Console.WriteLine(infoLog);
-        }
-        
         Handle = GL.CreateProgram();
 
-        GL.AttachShader(Handle, VertexShader);
-        GL.AttachShader(Handle, FragmentShader);
+        // attach and link shaders
+        GL.AttachShader(Handle, vertexShader);
+        GL.AttachShader(Handle, fragmentShader);
 
-        GL.LinkProgram(Handle);
+        LinkProgram(Handle);
 
-        GL.GetProgram(Handle, GetProgramParameterName.LinkStatus, out var success);
-        if (success != 0) return;
+        // cleanup
+        GL.DetachShader(Handle, vertexShader);
+        GL.DetachShader(Handle, fragmentShader);
+        GL.DeleteShader(fragmentShader);
+        GL.DeleteShader(vertexShader);
+
+        // number of active uniforms
+        GL.GetProgram(Handle, GetProgramParameterName.ActiveUniforms, out var numberOfUniforms);
+        _uniformLocations = new Dictionary<string, int>();
+
+        for (var i = 0; i < numberOfUniforms; i++)
         {
-            var infoLog = GL.GetProgramInfoLog(Handle);
-            Console.WriteLine(infoLog);
+            // get the name of this uniform,
+            var key = GL.GetActiveUniform(Handle, i, out _, out _);
+
+            // get the location,
+            var location = GL.GetUniformLocation(Handle, key);
+
+            // and then add it to the dictionary.
+            _uniformLocations.Add(key, location);
+        }
+    }
+
+    private static void CompileShader(int shader)
+    {
+        // Try to compile the shader
+        GL.CompileShader(shader);
+
+        // Check for compilation errors
+        GL.GetShader(shader, ShaderParameter.CompileStatus, out var code);
+        if (code != (int)All.True)
+        {
+            // We can use `GL.GetShaderInfoLog(shader)` to get information about the error.
+            var infoLog = GL.GetShaderInfoLog(shader);
+            throw new Exception($"Error occurred whilst compiling Shader({shader}).\n\n{infoLog}");
+        }
+    }
+
+    private static void LinkProgram(int program)
+    {
+        // We link the program
+        GL.LinkProgram(program);
+
+        // Check for linking errors
+        GL.GetProgram(program, GetProgramParameterName.LinkStatus, out var code);
+        if (code != (int)All.True)
+        {
+            // We can use `GL.GetProgramInfoLog(program)` to get information about the error.
+            throw new Exception($"Error occurred whilst linking Program({program})");
         }
     }
     
@@ -62,30 +95,29 @@ public class Shadery
     
     public void SetInt(string name, int value)
     {
-        var location = GL.GetUniformLocation(Handle, name);
-
-        GL.Uniform1(location, value);
-    }
-    
-    // ReSharper disable once RedundantDefaultMemberInitializer
-    private bool disposedValue = false;
-
-    private void Dispose(bool disposing)
-    {
-        if (disposedValue) return;
-        GL.DeleteProgram(Handle);
-
-        disposedValue = true;
+        GL.UseProgram(Handle);
+        if (_uniformLocations == null) throw new ArgumentNullException(nameof(_uniformLocations));
+        GL.Uniform1(_uniformLocations![name], value);
     }
 
-    ~Shadery()
+    public void SetFloat(string name, float value)
     {
-        GL.DeleteProgram(Handle);
+        GL.UseProgram(Handle);
+        if (_uniformLocations == null) throw new ArgumentNullException(nameof(_uniformLocations));
+        GL.Uniform1(_uniformLocations![name], value);
     }
-    
-    public void Dispose()
+
+    public void SetMatrix4(string name, Matrix4 data)
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        GL.UseProgram(Handle);
+        if (_uniformLocations == null) throw new ArgumentNullException(nameof(_uniformLocations));
+        GL.UniformMatrix4(_uniformLocations![name], true, ref data);
+    }
+
+    public void SetVector3(string name, Vector3 data)
+    {
+        GL.UseProgram(Handle);
+        if (_uniformLocations == null) throw new ArgumentNullException(nameof(_uniformLocations));
+        GL.Uniform3(_uniformLocations![name], data);
     }
 }

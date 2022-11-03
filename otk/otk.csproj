@@ -18,7 +18,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="assets" />
+      <None Remove=".Okno.cs.un~"/>
     </ItemGroup>
 
 </Project>
